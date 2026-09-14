@@ -7,29 +7,29 @@ const prisma = new PrismaClient();
 
 // Helper para normalizar texto para coincidencias
 function normalizar(text: string | null | undefined): string {
-  if (!text) return "";
-  return text.toString().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (!text) return "";
+    return text.toString().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function convertir24(horaStr: string | null | undefined): number {
-  if (!horaStr) return 0;
-  const s = horaStr.toString().trim().toLowerCase();
-  const match12 = s.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
-  if (match12) {
-    let h = parseInt(match12[1], 10);
-    const m = parseInt(match12[2], 10);
-    const p = match12[3];
-    if (p === "pm" && h !== 12) h += 12;
-    if (p === "am" && h === 12) h = 0;
-    return h * 60 + m;
-  }
-  const match24 = s.match(/(\d{1,2}):(\d{2})/);
-  if (match24) {
-    const h = parseInt(match24[1], 10);
-    const m = parseInt(match24[2], 10);
-    return h * 60 + m;
-  }
-  return 0;
+    if (!horaStr) return 0;
+    const s = horaStr.toString().trim().toLowerCase();
+    const match12 = s.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+    if (match12) {
+        let h = parseInt(match12[1], 10);
+        const m = parseInt(match12[2], 10);
+        const p = match12[3];
+        if (p === "pm" && h !== 12) h += 12;
+        if (p === "am" && h === 12) h = 0;
+        return h * 60 + m;
+    }
+    const match24 = s.match(/(\d{1,2}):(\d{2})/);
+    if (match24) {
+        const h = parseInt(match24[1], 10);
+        const m = parseInt(match24[2], 10);
+        return h * 60 + m;
+    }
+    return 0;
 }
 
 function formatearHora(horaRaw: any): string {
@@ -97,7 +97,7 @@ function parseNewFormat(text: string) {
             i++;
             continue;
         }
-        
+
         const codigo = codeMatch[1].trim();
         const block = [];
         i++;
@@ -124,7 +124,7 @@ function parseNewFormat(text: string) {
             }
             if (docente) continue;
             if (line.match(/Sin\s+horario|^\d{2}\.\d{2}\.\d{4}|^-$|B\s*\|/i)) continue;
-            
+
             materiaLines.push(line);
         }
 
@@ -160,7 +160,7 @@ async function extractFromPdf(pdfPath: string, promocion: string) {
 
     const header = parseHeader(fullText);
     let rows = parseNewFormat(fullText);
-    
+
     if (rows.length === 0) {
         rows = parseFallback(fullText);
     }
@@ -175,145 +175,145 @@ async function extractFromPdf(pdfPath: string, promocion: string) {
 }
 
 async function main() {
-  const baseDir = path.join(process.cwd(), 'H');
-  
-  console.log(`Leyendo PDFs directamente usando TypeScript desde ${baseDir}...`);
-  
-  if (!fs.existsSync(baseDir)) {
-      console.log(`La carpeta ${baseDir} no existe. Por favor, créala y coloca los PDFs allí.`);
-      return;
-  }
+    const baseDir = path.join(process.cwd(), 'H');
 
-  const allRows: any[] = [];
-  const promocionDirs = fs.readdirSync(baseDir, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => dirent.name);
+    console.log(`Leyendo PDFs directamente usando TypeScript desde ${baseDir}...`);
 
-  for (const promocion of promocionDirs) {
-      const promoPath = path.join(baseDir, promocion);
-      
-      const getPdfFiles = (dir: string): string[] => {
-          let results: string[] = [];
-          const list = fs.readdirSync(dir);
-          for (const file of list) {
-              const fullPath = path.join(dir, file);
-              const stat = fs.statSync(fullPath);
-              if (stat && stat.isDirectory()) results = results.concat(getPdfFiles(fullPath));
-              else if (file.toLowerCase().endsWith('.pdf')) results.push(fullPath);
-          }
-          return results;
-      };
+    if (!fs.existsSync(baseDir)) {
+        console.log(`La carpeta ${baseDir} no existe. Por favor, créala y coloca los PDFs allí.`);
+        return;
+    }
 
-      const pdfs = getPdfFiles(promoPath);
-      if (pdfs.length === 0) continue;
+    const allRows: any[] = [];
+    const promocionDirs = fs.readdirSync(baseDir, { withFileTypes: true })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => dirent.name);
 
-      console.log(`Promoción: ${promocion} - ${pdfs.length} PDFs`);
-      for (const pdfPath of pdfs) {
-          try {
-              const rows = await extractFromPdf(pdfPath, promocion);
-              allRows.push(...rows);
-          } catch (e) {
-              console.error(`Error procesando ${pdfPath}:`, e);
-          }
-      }
-  }
+    for (const promocion of promocionDirs) {
+        const promoPath = path.join(baseDir, promocion);
 
-  if (allRows.length === 0) {
-      console.log("No se extrajeron datos de los PDFs.");
-      return;
-  }
+        const getPdfFiles = (dir: string): string[] => {
+            let results: string[] = [];
+            const list = fs.readdirSync(dir);
+            for (const file of list) {
+                const fullPath = path.join(dir, file);
+                const stat = fs.statSync(fullPath);
+                if (stat && stat.isDirectory()) results = results.concat(getPdfFiles(fullPath));
+                else if (file.toLowerCase().endsWith('.pdf')) results.push(fullPath);
+            }
+            return results;
+        };
 
-  console.log(`Se extrajeron ${allRows.length} registros (materias/franjas) de los PDFs.`);
-  
-  // Cargar estudiantes actuales a memoria para buscar rápido
-  const allStudents = await prisma.student.findMany({
-      select: { id: true, nombre_norm: true, nombre_completo: true, correo: true }
-  });
+        const pdfs = getPdfFiles(promoPath);
+        if (pdfs.length === 0) continue;
 
-  console.log("Mapeando horarios a estudiantes por nombre (priorizando perfiles completos)...");
-  const schedulesToInsert = [];
-  let noMatchCount = 0;
+        console.log(`Promoción: ${promocion} - ${pdfs.length} PDFs`);
+        for (const pdfPath of pdfs) {
+            try {
+                const rows = await extractFromPdf(pdfPath, promocion);
+                allRows.push(...rows);
+            } catch (e) {
+                console.error(`Error procesando ${pdfPath}:`, e);
+            }
+        }
+    }
 
-  for (const record of allRows) {
-      const nombreEstudiante = record.Nombre_Estudiante;
-      const normNombre = normalizar(nombreEstudiante);
-      const pdfWords = normNombre.split(" ").filter(w => w.length > 2);
-      
-      let matchedStudentId: string | undefined = undefined;
-      
-      // Buscar coincidencias por nombre (al menos 2 palabras clave coincidentes)
-      const scoredMatches = allStudents.map(s => {
-          const dbWords = s.nombre_norm.split(" ");
-          const matchCount = pdfWords.filter(w => dbWords.includes(w)).length;
-          return { student: s, matchCount };
-      }).filter(x => x.matchCount >= (pdfWords.length < 2 ? 1 : 2));
+    if (allRows.length === 0) {
+        console.log("No se extrajeron datos de los PDFs.");
+        return;
+    }
 
-      if (scoredMatches.length > 0) {
-          scoredMatches.sort((a, b) => {
-              if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
-              const aHasBase = a.student.correo ? 1 : 0;
-              const bHasBase = b.student.correo ? 1 : 0;
-              return bHasBase - aHasBase;
-          });
-          matchedStudentId = scoredMatches[0].student.id;
-      }
-      
-      // Si a pesar de todo no existe, ignoramos (como lo pidió el usuario, no crear falsos)
-      if (!matchedStudentId) {
-          noMatchCount++;
-          continue;
-      }
-      
-      const dia = record.Dia?.trim().toUpperCase();
-      const horaInicioStr = record.Hora_Inicio;
-      const horaFinStr = record.Hora_Fin;
-      const materia = record.Materia;
-      
-      if (!dia || !horaInicioStr || !horaFinStr || !materia) {
-          continue; // Falta información vital
-      }
+    console.log(`Se extrajeron ${allRows.length} registros (materias/franjas) de los PDFs.`);
 
-      const horaInicioMin = convertir24(horaInicioStr);
-      const horaFinMin = convertir24(horaFinStr);
+    // Cargar estudiantes actuales a memoria para buscar rápido
+    const allStudents = await prisma.student.findMany({
+        select: { id: true, nombre_norm: true, nombre_completo: true, correo: true }
+    });
 
-      schedulesToInsert.push({
-          studentId: matchedStudentId,
-          promocion: record.Promocion || null,
-          periodo: record.Periodo || null,
-          dia: dia,
-          hora_inicio: formatearHora(horaInicioStr),
-          hora_fin: formatearHora(horaFinStr),
-          hora_inicio_min: horaInicioMin,
-          hora_fin_min: horaFinMin,
-          prog: record.Prog || null,
-          codigo_clase: record.Codigo_Clase || null,
-          materia: String(materia).trim(),
-          docente: record.Docente || null,
-      });
-  }
+    console.log("Mapeando horarios a estudiantes por nombre (priorizando perfiles completos)...");
+    const schedulesToInsert = [];
+    let noMatchCount = 0;
 
-  console.log(`Se ignoraron ${noMatchCount} registros que no coincidieron con estudiantes de Información.xlsx.`);
-  console.log(`Preparando inserción de ${schedulesToInsert.length} horarios a la base de datos...`);
+    for (const record of allRows) {
+        const nombreEstudiante = record.Nombre_Estudiante;
+        const normNombre = normalizar(nombreEstudiante);
+        const pdfWords = normNombre.split(" ").filter(w => w.length > 2);
 
-  console.log("Limpiando tabla Schedule (para evitar duplicados en recargas)...");
-  await prisma.schedule.deleteMany();
+        let matchedStudentId: string | undefined = undefined;
 
-  const chunkSize = 5000;
-  for (let i = 0; i < schedulesToInsert.length; i += chunkSize) {
-      const chunk = schedulesToInsert.slice(i, i + chunkSize);
-      await prisma.schedule.createMany({ data: chunk });
-      console.log(`Insertados ${i + chunk.length} de ${schedulesToInsert.length} horarios...`);
-  }
+        // Buscar coincidencias por nombre (al menos 2 palabras clave coincidentes)
+        const scoredMatches = allStudents.map(s => {
+            const dbWords = s.nombre_norm.split(" ");
+            const matchCount = pdfWords.filter(w => dbWords.includes(w)).length;
+            return { student: s, matchCount };
+        }).filter(x => x.matchCount >= (pdfWords.length < 2 ? 1 : 2));
 
-  console.log("¡Carga de horarios completada exitosamente sin usar Python ni CSV!");
+        if (scoredMatches.length > 0) {
+            scoredMatches.sort((a, b) => {
+                if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+                const aHasBase = a.student.correo ? 1 : 0;
+                const bHasBase = b.student.correo ? 1 : 0;
+                return bHasBase - aHasBase;
+            });
+            matchedStudentId = scoredMatches[0].student.id;
+        }
+
+        // Si a pesar de todo no existe, ignoramos (como lo pidió el usuario, no crear falsos)
+        if (!matchedStudentId) {
+            noMatchCount++;
+            continue;
+        }
+
+        const dia = record.Dia?.trim().toUpperCase();
+        const horaInicioStr = record.Hora_Inicio;
+        const horaFinStr = record.Hora_Fin;
+        const materia = record.Materia;
+
+        if (!dia || !horaInicioStr || !horaFinStr || !materia) {
+            continue; // Falta información vital
+        }
+
+        const horaInicioMin = convertir24(horaInicioStr);
+        const horaFinMin = convertir24(horaFinStr);
+
+        schedulesToInsert.push({
+            studentId: matchedStudentId,
+            promocion: record.Promocion || null,
+            periodo: record.Periodo || null,
+            dia: dia,
+            hora_inicio: formatearHora(horaInicioStr),
+            hora_fin: formatearHora(horaFinStr),
+            hora_inicio_min: horaInicioMin,
+            hora_fin_min: horaFinMin,
+            prog: record.Prog || null,
+            codigo_clase: record.Codigo_Clase || null,
+            materia: String(materia).trim(),
+            docente: record.Docente || null,
+        });
+    }
+
+    console.log(`Se ignoraron ${noMatchCount} registros que no coincidieron con estudiantes de Información.xlsx.`);
+    console.log(`Preparando inserción de ${schedulesToInsert.length} horarios a la base de datos...`);
+
+    console.log("Limpiando tabla Schedule (para evitar duplicados en recargas)...");
+    await prisma.schedule.deleteMany();
+
+    const chunkSize = 5000;
+    for (let i = 0; i < schedulesToInsert.length; i += chunkSize) {
+        const chunk = schedulesToInsert.slice(i, i + chunkSize);
+        await prisma.schedule.createMany({ data: chunk });
+        console.log(`Insertados ${i + chunk.length} de ${schedulesToInsert.length} horarios...`);
+    }
+
+    console.log("¡Carga de horarios completada exitosamente");
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error("Fallo inesperado:", e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+    .then(async () => {
+        await prisma.$disconnect();
+    })
+    .catch(async (e) => {
+        console.error("Fallo inesperado:", e);
+        await prisma.$disconnect();
+        process.exit(1);
+    });
