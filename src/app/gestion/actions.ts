@@ -222,15 +222,20 @@ export async function previewSchedulesPdf(formData: FormData, promocion: string)
       
       let matchedStudent: any = undefined;
       
-      let possibleMatches = allStudents.filter(s => {
+      const scoredMatches = allStudents.map(s => {
           const dbWords = s.nombre_norm.split(" ");
           const matchCount = pdfWords.filter(w => dbWords.includes(w)).length;
-          return matchCount >= (pdfWords.length < 2 ? 1 : 2);
-      });
+          return { student: s, matchCount };
+      }).filter(x => x.matchCount >= (pdfWords.length < 2 ? 1 : 2));
 
-      if (possibleMatches.length > 0) {
-          const conBase = possibleMatches.filter(s => s.correo);
-          matchedStudent = conBase.length > 0 ? conBase[0] : possibleMatches[0];
+      if (scoredMatches.length > 0) {
+          scoredMatches.sort((a, b) => {
+              if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+              const aHasBase = a.student.correo ? 1 : 0;
+              const bHasBase = b.student.correo ? 1 : 0;
+              return bHasBase - aHasBase;
+          });
+          matchedStudent = scoredMatches[0].student;
       }
 
       if (!matchedStudent) {

@@ -242,20 +242,20 @@ async function main() {
       let matchedStudentId: string | undefined = undefined;
       
       // Buscar coincidencias por nombre (al menos 2 palabras clave coincidentes)
-      let possibleMatches = allStudents.filter(s => {
+      const scoredMatches = allStudents.map(s => {
           const dbWords = s.nombre_norm.split(" ");
           const matchCount = pdfWords.filter(w => dbWords.includes(w)).length;
-          return matchCount >= (pdfWords.length < 2 ? 1 : 2);
-      });
+          return { student: s, matchCount };
+      }).filter(x => x.matchCount >= (pdfWords.length < 2 ? 1 : 2));
 
-      if (possibleMatches.length > 0) {
-          // Priorizar el perfil "base" (el que tiene correo/información completa)
-          const conBase = possibleMatches.filter(s => s.correo);
-          if (conBase.length > 0) {
-              matchedStudentId = conBase[0].id;
-          } else {
-              matchedStudentId = possibleMatches[0].id;
-          }
+      if (scoredMatches.length > 0) {
+          scoredMatches.sort((a, b) => {
+              if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount;
+              const aHasBase = a.student.correo ? 1 : 0;
+              const bHasBase = b.student.correo ? 1 : 0;
+              return bHasBase - aHasBase;
+          });
+          matchedStudentId = scoredMatches[0].student.id;
       }
       
       // Si a pesar de todo no existe, ignoramos (como lo pidió el usuario, no crear falsos)
