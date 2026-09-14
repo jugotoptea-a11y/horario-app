@@ -26,6 +26,11 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
   const [resultadoHorario, setResultadoHorario] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // Table filters and sorting
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [tableFilter, setTableFilter] = useState('');
+  const [promoFilter, setPromoFilter] = useState<string>('TODAS');
+
   // New features
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [modalStudent, setModalStudent] = useState<any | null>(null);
@@ -109,10 +114,59 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
 
   const isTodasPromo = selPromociones.includes("TODAS") || selPromociones.length === 0;
 
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedAndFilteredResult = useMemo(() => {
+    let result = [...resultadoDisponibles];
+    
+    if (tableFilter) {
+      const lower = tableFilter.toLowerCase();
+      result = result.filter(e => 
+        e.nombre_completo.toLowerCase().includes(lower) || 
+        String(e.id).toLowerCase().includes(lower) || 
+        String(e.promo).toLowerCase().includes(lower) ||
+        (e.correo && e.correo.toLowerCase().includes(lower)) ||
+        (e.contacto && String(e.contacto).toLowerCase().includes(lower))
+      );
+    }
+    
+    if (promoFilter && promoFilter !== 'TODAS') {
+      result = result.filter(e => String(e.promo) === promoFilter);
+    }
+    
+    if (sortConfig) {
+      result.sort((a, b) => {
+        let valA = a[sortConfig.key] || '';
+        let valB = b[sortConfig.key] || '';
+        
+        if (sortConfig.key === 'id' || sortConfig.key === 'promo') {
+          const numA = Number(valA);
+          const numB = Number(valB);
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+          }
+        }
+        
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [resultadoDisponibles, sortConfig, tableFilter, promoFilter]);
+
   return (
     <div className="container" style={{ margin: '0 auto', marginTop: '30px', marginBottom: '30px' }}>
-      <nav className="top-menu">
+      <nav className="top-menu" style={{ display: 'flex', gap: '10px' }}>
         <a className="menu-link active" href="/">Disponibilidad</a>
+        <a className="menu-link" href="/gestion" style={{ textDecoration: 'none', color: '#666' }}>Gestión de Datos</a>
       </nav>
 
       <h2>Buscar estudiantes disponibles</h2>
@@ -135,6 +189,7 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
                   let next = selPromociones.filter(x => x !== "TODAS");
                   if (e.target.checked) next.push(p);
                   else next = next.filter(x => x !== p);
+                  next.sort((a, b) => initPromociones.indexOf(a) - initPromociones.indexOf(b));
                   setSelPromociones(next);
                 }} />
                 <label htmlFor={`promo-${idx}`} data-order={checked ? selPromociones.indexOf(p)+1 : ""}>{p}</label>
@@ -179,7 +234,11 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
                 return (
                   <div className="day-checkbox" key={d}>
                     <input type="checkbox" id={`day-${idx}`} checked={checked} onChange={(e) => {
-                      if(e.target.checked) setSelDias([...selDias, d]);
+                      if(e.target.checked) {
+                        const next = [...selDias, d];
+                        next.sort((a, b) => DIAS.indexOf(a) - DIAS.indexOf(b));
+                        setSelDias(next);
+                      }
                       else setSelDias(selDias.filter(x => x !== d));
                     }} />
                     <label htmlFor={`day-${idx}`} data-order={checked ? selDias.indexOf(d)+1 : ""}>{d}</label>
@@ -330,19 +389,44 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
       {resultadoDisponibles.length > 0 && (
         <div className={`result ${modo === 'antidisponibilidad' ? 'result-antidisponibilidad' : ''}`}>
           <h3>
-            {modo === 'antidisponibilidad' ? 'Estudiantes NO disponibles' : 'Estudiantes disponibles'} ({resultadoDisponibles.length})
+            {modo === 'antidisponibilidad' ? 'Estudiantes NO disponibles' : 'Estudiantes disponibles'} ({sortedAndFilteredResult.length})
           </h3>
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Buscar en tabla</label>
+              <input 
+                type="text" 
+                placeholder="Buscar..." 
+                value={tableFilter} 
+                onChange={e => setTableFilter(e.target.value)} 
+                style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Filtrar Promoción</label>
+              <select 
+                value={promoFilter} 
+                onChange={e => setPromoFilter(e.target.value)}
+                style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }}
+              >
+                <option value="TODAS">Todas</option>
+                {Array.from(new Set(resultadoDisponibles.map(e => String(e.promo)))).sort().map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="copy-tools" style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <button type="button" onClick={() => setSelectedRows(new Set(resultadoDisponibles.map(e => e.id)))} style={{ width: 'auto', padding: '6px 10px', fontSize: '12px', marginBottom: 0 }}>Seleccionar todo</button>
+            <button type="button" onClick={() => setSelectedRows(new Set(sortedAndFilteredResult.map(e => e.id)))} style={{ width: 'auto', padding: '6px 10px', fontSize: '12px', marginBottom: 0 }}>Seleccionar todo</button>
             <button type="button" onClick={() => setSelectedRows(new Set())} style={{ width: 'auto', padding: '6px 10px', fontSize: '12px', marginBottom: 0 }}>Quitar selección</button>
             <button type="button" onClick={() => {
-              const sel = resultadoDisponibles.filter(e => selectedRows.has(e.id));
+              const sel = sortedAndFilteredResult.filter(e => selectedRows.has(e.id));
               if (sel.length === 0) return alert('Selecciona al menos una fila');
               const text = ["Nombre\tDocumento\tPromoción\tCorreo\tContacto"].concat(sel.map(e => `${e.nombre_completo}\t${e.id}\t${e.promo}\t${e.correo || ''}\t${e.contacto || ''}`)).join('\n');
               handleCopy(text, 'selected');
             }} style={{ width: 'auto', padding: '6px 10px', fontSize: '12px', marginBottom: 0 }}>{copiedId === 'selected' ? 'Copiado' : 'Copiar seleccionados'}</button>
             <button type="button" onClick={() => {
-              const text = ["Nombre\tDocumento\tPromoción\tCorreo\tContacto"].concat(resultadoDisponibles.map(e => `${e.nombre_completo}\t${e.id}\t${e.promo}\t${e.correo || ''}\t${e.contacto || ''}`)).join('\n');
+              const text = ["Nombre\tDocumento\tPromoción\tCorreo\tContacto"].concat(sortedAndFilteredResult.map(e => `${e.nombre_completo}\t${e.id}\t${e.promo}\t${e.correo || ''}\t${e.contacto || ''}`)).join('\n');
               handleCopy(text, 'all');
             }} style={{ width: 'auto', padding: '6px 10px', fontSize: '12px', marginBottom: 0 }}>{copiedId === 'all' ? 'Copiado' : 'Copiar todo'}</button>
           </div>
@@ -350,21 +434,31 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
             <thead>
               <tr>
                 <th style={{width: '34px', textAlign: 'center'}}>
-                  <input type="checkbox" checked={selectedRows.size === resultadoDisponibles.length && resultadoDisponibles.length > 0} onChange={e => {
-                    if (e.target.checked) setSelectedRows(new Set(resultadoDisponibles.map(e => e.id)));
+                  <input type="checkbox" checked={selectedRows.size === sortedAndFilteredResult.length && sortedAndFilteredResult.length > 0} onChange={e => {
+                    if (e.target.checked) setSelectedRows(new Set(sortedAndFilteredResult.map(e => e.id)));
                     else setSelectedRows(new Set());
                   }} />
                 </th>
-                <th>Nombre</th>
-                <th>Documento</th>
-                <th>Promocion</th>
-                <th>Correo</th>
-                <th>Contacto</th>
+                <th style={{cursor: 'pointer'}} onClick={() => requestSort('nombre_completo')}>
+                  Nombre {sortConfig?.key === 'nombre_completo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{cursor: 'pointer'}} onClick={() => requestSort('id')}>
+                  Documento {sortConfig?.key === 'id' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{cursor: 'pointer'}} onClick={() => requestSort('promo')}>
+                  Promoción {sortConfig?.key === 'promo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{cursor: 'pointer'}} onClick={() => requestSort('correo')}>
+                  Correo {sortConfig?.key === 'correo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th style={{cursor: 'pointer'}} onClick={() => requestSort('contacto')}>
+                  Contacto {sortConfig?.key === 'contacto' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
                 <th>Acción</th>
               </tr>
             </thead>
             <tbody>
-              {resultadoDisponibles.map(est => (
+              {sortedAndFilteredResult.map(est => (
                 <tr className="result-row" key={est.id} style={{ cursor: 'pointer' }} onClick={() => openModal(est)}>
                   <td style={{textAlign: 'center'}} onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={selectedRows.has(est.id)} onChange={e => {
