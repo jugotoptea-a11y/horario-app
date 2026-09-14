@@ -1,7 +1,5 @@
 "use server";
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 export async function getPromociones() {
   const proms = await prisma.student.findMany({
