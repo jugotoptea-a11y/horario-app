@@ -2,7 +2,7 @@
 
 import { parse } from 'csv-parse/sync';
 import pdf from 'pdf-parse';
-import { prisma } from '../../lib/prisma';
+import { prisma } from '../lib/prisma';
 
 // Helper para normalizar texto
 function normalizar(text: string | null | undefined): string {
@@ -15,32 +15,102 @@ function normalizar(text: string | null | undefined): string {
 // -------------------------------------------------------------
 
 export async function previewStudentsCsv(formData: FormData) {
+  const allowUpdate = formData.get("allowUpdate") === "true";
   const file = formData.get("file") as File;
   if (!file) throw new Error("No se proporcionó archivo");
 
   const text = await file.text();
   const records = parse(text, { columns: true, skip_empty_lines: true, bom: true });
 
-  const currentStudents = await prisma.student.findMany({ select: { id: true } });
+  const currentStudents = await prisma.student.findMany({ select: { id: true, correo: true, contacto: true } });
   const currentIds = new Set(currentStudents.map(s => s.id));
+  
+  const emailMap = new Map();
+  const phoneMap = new Map();
+  for (const s of currentStudents) {
+    if (s.correo) emailMap.set(s.correo.toLowerCase(), s.id);
+    if (s.contacto) phoneMap.set(s.contacto, s.id);
+  }
+
+  const csvEmails = new Set();
+  const csvPhones = new Set();
+  const csvDocs = new Set();
 
   const results = [];
   
   for (const record of records) {
-    const id = record["Documento"]?.trim().replace(/\.0$/, "");
-    const nombre = record["Nombre"]?.trim();
-    if (!id || !nombre) continue;
+    const errores: string[] = [];
+    
+    const idRaw = record["Documento"]?.trim().replace(/\.0$/, "");
+    if (!idRaw) errores.push("El documento no puede estar vacío");
+    else if (!/^\d+$/.test(idRaw)) errores.push("El documento debe contener solo números");
+    const id = idRaw || "";
+
+    const pNombre = record["Primer Nombre"]?.trim();
+    const sNombre = record["Segundo Nombre"]?.trim();
+    const pApellido = record["Primer Apellido"]?.trim();
+    const sApellido = record["Segundo Apellido"]?.trim();
+    
+    if (!pNombre) errores.push("El primer nombre es obligatorio");
+    if (!pApellido) errores.push("El primer apellido es obligatorio");
+    if (!sApellido) errores.push("El segundo apellido es obligatorio");
+
+    const parts = [pNombre, sNombre, pApellido, sApellido].filter(Boolean);
+    const nombre_completo = parts.join(" ");
+    
+    if (!nombre_completo) errores.push("No se pudo formar el nombre del estudiante");
+
+    const promo = record["Promocion"]?.trim();
+    if (!promo) errores.push("La promoción es obligatoria");
+
+    const correo = record["Correo"]?.trim();
+    if (!correo) errores.push("El correo es obligatorio");
+    const contacto = record["Contacto"]?.trim();
+    if (!contacto) errores.push("El contacto es obligatorio");
+    const municipio = record["Municipio"]?.trim();
+    if (!municipio) errores.push("El municipio es obligatorio");
+    const programa = record["Programa"]?.trim();
+    if (!programa) errores.push("El programa es obligatorio");
 
     const exists = currentIds.has(id);
+    if (exists && !allowUpdate) {
+      errores.push("El documento ya existe y no habilitaste la opción de actualizar");
+    }
+
+    if (id) {
+      if (csvDocs.has(id)) errores.push("Documento duplicado en este mismo archivo CSV");
+      else csvDocs.add(id);
+    }
+
+    if (correo) {
+      const lowerCorreo = correo.toLowerCase();
+      if (csvEmails.has(lowerCorreo)) errores.push("Correo duplicado en este mismo archivo CSV");
+      else csvEmails.add(lowerCorreo);
+      
+      if (emailMap.has(lowerCorreo) && emailMap.get(lowerCorreo) !== id) {
+        errores.push("El correo ya está registrado por otro estudiante en la BD");
+      }
+    }
+
+    if (contacto) {
+      if (csvPhones.has(contacto)) errores.push("Contacto duplicado en este mismo archivo CSV");
+      else csvPhones.add(contacto);
+
+      if (phoneMap.has(contacto) && phoneMap.get(contacto) !== id) {
+        errores.push("El número de contacto ya está registrado por otro estudiante en la BD");
+      }
+    }
+
     results.push({
       id,
-      nombre_completo: nombre,
-      promo: record["Promocion"]?.trim() || null,
-      correo: record["Correo"]?.trim() || null,
-      contacto: record["Contacto"]?.trim() || null,
-      municipio: record["Municipio"]?.trim() || null,
-      programa: record["Programa"]?.trim() || null,
-      estado: exists ? "Actualizar" : "Nuevo"
+      nombre_completo,
+      promo: promo || null,
+      correo: correo || null,
+      contacto: contacto || null,
+      municipio: municipio || null,
+      programa: programa || null,
+      estado: exists ? "Actualizar" : "Nuevo",
+      errores
     });
   }
 
