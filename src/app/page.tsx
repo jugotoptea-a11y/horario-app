@@ -1,5 +1,5 @@
-import { getPromociones, getEstudiantes } from "./actions";
-import MainClient from "./MainClient";
+import { getPromociones, getEstudiantes } from "../actions/homeActions";
+import MainClient from "../components/home/MainClient";
 
 export default async function Home() {
   const prom = await getPromociones();
