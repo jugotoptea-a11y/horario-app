@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "cargar-horarios": "npx tsc scripts/cargar_horarios.ts --skipLibCheck --esModuleInterop && node scripts/cargar_horarios.js"
+    "cargar-horarios": "ts-node scripts/cargar_horarios.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
@@ -30,8 +30,7 @@
     "prisma": "^5.10.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
-    "typescript": "^5",
-    "xlsx": "^0.18.5"
+    "typescript": "^5"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
