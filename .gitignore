@@ -42,3 +42,8 @@ next-env.d.ts
 
 # compiled scripts
 scripts/*.js
+
+# Data files and sensitive folders
+/H/
+*.pdf
+*.csv
