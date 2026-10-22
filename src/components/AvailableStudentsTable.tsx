@@ -143,11 +143,11 @@ export default function AvailableStudentsTable({ estudiantes, modo, onStudentCli
         <button type="button" onClick={() => {
           const sel = sortedAndFilteredResult.filter(e => selectedRows.has(e.id));
           if (sel.length === 0) return alert('Selecciona al menos una fila');
-          const text = ["Nombre\tDocumento\tPromoción\tCorreo\tContacto"].concat(sel.map(e => `${e.nombre_completo}\t${e.id}\t${e.promo}\t${e.correo || ''}\t${e.contacto || ''}`)).join('\n');
+          const text = ["Prom\tNombre\tDocumento\tCorreo\tContacto"].concat(sel.map(e => `${e.promo}\t${e.nombre_completo}\t${e.id}\t${e.correo || ''}\t${e.contacto || ''}`)).join('\n');
           handleCopy(text, 'selected');
         }} style={{ width: 'auto', padding: '6px 10px', fontSize: '12px', marginBottom: 0 }}>{copiedId === 'selected' ? 'Copiado' : 'Copiar seleccionados'}</button>
         <button type="button" onClick={() => {
-          const text = ["Nombre\tDocumento\tPromoción\tCorreo\tContacto"].concat(sortedAndFilteredResult.map(e => `${e.nombre_completo}\t${e.id}\t${e.promo}\t${e.correo || ''}\t${e.contacto || ''}`)).join('\n');
+          const text = ["Prom\tNombre\tDocumento\tCorreo\tContacto"].concat(sortedAndFilteredResult.map(e => `${e.promo}\t${e.nombre_completo}\t${e.id}\t${e.correo || ''}\t${e.contacto || ''}`)).join('\n');
           handleCopy(text, 'all');
         }} style={{ width: 'auto', padding: '6px 10px', fontSize: '12px', marginBottom: 0 }}>{copiedId === 'all' ? 'Copiado' : 'Copiar todo'}</button>
       </div>
@@ -160,14 +160,14 @@ export default function AvailableStudentsTable({ estudiantes, modo, onStudentCli
                 else setSelectedRows(new Set());
               }} />
             </th>
+            <th style={{cursor: 'pointer'}} onClick={() => requestSort('promo')}>
+              Prom {sortConfig?.key === 'promo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+            </th>
             <th style={{cursor: 'pointer'}} onClick={() => requestSort('nombre_completo')}>
               Nombre {sortConfig?.key === 'nombre_completo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
             </th>
             <th style={{cursor: 'pointer'}} onClick={() => requestSort('id')}>
               Documento {sortConfig?.key === 'id' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
-            </th>
-            <th style={{cursor: 'pointer'}} onClick={() => requestSort('promo')}>
-              Promoción {sortConfig?.key === 'promo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
             </th>
             <th style={{cursor: 'pointer'}} onClick={() => requestSort('correo')}>
               Correo {sortConfig?.key === 'correo' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
@@ -189,13 +189,13 @@ export default function AvailableStudentsTable({ estudiantes, modo, onStudentCli
                   setSelectedRows(next);
                 }} />
               </td>
+              <td className="est-promo">{est.promo}</td>
               <td className="est-nombre">{est.nombre_completo}</td>
               <td className="est-doc">{est.id}</td>
-              <td className="est-promo">{est.promo}</td>
               <td className="est-correo">{est.correo}</td>
               <td className="est-contacto">{est.contacto}</td>
               <td onClick={e => e.stopPropagation()}>
-                <button type="button" onClick={() => handleCopy(`${est.nombre_completo}\t${est.id}\t${est.promo}\t${est.correo || ''}\t${est.contacto || ''}`, est.id)} style={{ width: 'auto', padding: '4px 8px', fontSize: '11px', margin: 0, borderRadius: '6px' }}>
+                <button type="button" onClick={() => handleCopy(`${est.promo}\t${est.nombre_completo}\t${est.id}\t${est.correo || ''}\t${est.contacto || ''}`, est.id)} style={{ width: 'auto', padding: '4px 8px', fontSize: '11px', margin: 0, borderRadius: '6px' }}>
                   {copiedId === est.id ? 'Copiado' : 'Copiar'}
                 </button>
               </td>
