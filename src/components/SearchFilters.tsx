@@ -18,7 +18,7 @@ interface SearchFiltersProps {
   setIntervalosGlobal: Dispatch<SetStateAction<{ inicio: string, fin: string }>>;
   intervalosDia: Record<string, { inicio: string, fin: string }[]>;
   setIntervalosDia: Dispatch<SetStateAction<Record<string, { inicio: string, fin: string }[]>>>;
-  handleBuscar: (e: React.FormEvent) => void;
+  handleBuscar?: (e?: React.FormEvent) => void;
 }
 
 export default function SearchFilters({
@@ -55,7 +55,7 @@ export default function SearchFilters({
   const isTodasPromo = selPromociones.includes("TODAS") || selPromociones.length === 0;
 
   return (
-    <form onSubmit={handleBuscar}>
+    <form onSubmit={(e) => { e.preventDefault(); handleBuscar?.(e); }}>
       <label>Promoción <small>(selecciona una o varias, o "Todas")</small></label>
       <div className="days-selector">
         <div className="day-checkbox promo-todas">
@@ -261,10 +261,6 @@ export default function SearchFilters({
           <label htmlFor="modo-anti">Antidisponibilidad</label>
         </div>
       </div>
-
-      <button type="submit" id="btn-buscar" className={modo === "antidisponibilidad" ? "btn-antidisponibilidad" : ""}>
-        {modo === "disponibilidad" ? "Buscar disponibilidad" : "Buscar antidisponibilidad"}
-      </button>
     </form>
   );
 }

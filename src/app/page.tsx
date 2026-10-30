@@ -1,13 +1,15 @@
-import { getPromociones, getEstudiantes } from "../actions/homeActions";
+import { getPromociones, getAllStudentsWithSchedules } from "../actions/homeActions";
 import MainClient from "../components/home/MainClient";
 
 export default async function Home() {
-  const prom = await getPromociones();
-  const est = await getEstudiantes();
+  const [prom, allStudents] = await Promise.all([
+    getPromociones(),
+    getAllStudentsWithSchedules()
+  ]);
 
   return (
     <>
-      <MainClient initPromociones={prom} initEstudiantes={est} />
+      <MainClient initPromociones={prom} initAllStudents={allStudents} />
     </>
   );
 }

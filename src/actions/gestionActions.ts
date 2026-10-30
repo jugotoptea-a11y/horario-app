@@ -3,6 +3,7 @@
 import { parse } from 'csv-parse/sync';
 import pdf from 'pdf-parse';
 import { prisma } from '../lib/prisma';
+import { revalidatePath } from 'next/cache';
 
 // Helper para normalizar texto
 function normalizar(text: string | null | undefined): string {
@@ -144,6 +145,7 @@ export async function applyStudentsCsv(students: any[]) {
 
   await prisma.$transaction(transactionOps);
 
+  revalidatePath('/');
   return { creados, actualizados };
 }
 
@@ -394,5 +396,6 @@ export async function applySchedulesPdf(schedulesData: any[]) {
       await prisma.schedule.createMany({ data: chunk });
   }
 
+  revalidatePath('/');
   return schedulesToInsert.length;
 }

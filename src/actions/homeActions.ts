@@ -1,6 +1,38 @@
 "use server";
 import { prisma } from '../lib/prisma';
 
+export async function getAllStudentsWithSchedules() {
+  const students = await prisma.student.findMany({
+    orderBy: { nombre_norm: 'asc' },
+    select: {
+      id: true,
+      nombre_completo: true,
+      nombre_norm: true,
+      promo: true,
+      correo: true,
+      contacto: true,
+      schedules: {
+        select: {
+          id: true,
+          studentId: true,
+          dia: true,
+          hora_inicio: true,
+          hora_fin: true,
+          hora_inicio_min: true,
+          hora_fin_min: true,
+          materia: true,
+          docente: true,
+          codigo_clase: true,
+          promocion: true,
+          periodo: true,
+          prog: true
+        }
+      }
+    }
+  });
+  return students;
+}
+
 export async function getPromociones() {
   const proms = await prisma.student.findMany({
     select: { promo: true },

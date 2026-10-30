@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { buscarDisponibilidad, getHorarioClases, getEstudiantes } from "../../actions/homeActions";
+import React, { useState, useEffect, useMemo } from "react";
 import Header from "../Header";
 import SearchFilters from "../SearchFilters";
 import AvailableStudentsTable from "../AvailableStudentsTable";
@@ -9,48 +8,70 @@ import WeeklyTimetable from "../WeeklyTimetable";
 import StudentScheduleModal from "../StudentScheduleModal";
 import { toMin } from "../../utils/constants";
 
-export default function MainClient({ initPromociones, initEstudiantes }: { initPromociones: string[], initEstudiantes: any[] }) {
+interface MainClientProps {
+  initPromociones: string[];
+  initAllStudents?: any[];
+  initEstudiantes?: any[];
+}
+
+export default function MainClient({ initPromociones, initAllStudents = [], initEstudiantes = [] }: MainClientProps) {
   const [modo, setModo] = useState<"disponibilidad" | "antidisponibilidad">("disponibilidad");
   const [selPromociones, setSelPromociones] = useState<string[]>([]);
-  const [estudiantes, setEstudiantes] = useState<any[]>(initEstudiantes);
+  const allStudents = useMemo(() => initAllStudents.length > 0 ? initAllStudents : initEstudiantes, [initAllStudents, initEstudiantes]);
   const [selEstudiantes, setSelEstudiantes] = useState<string[]>([]);
   
   const [selDias, setSelDias] = useState<string[]>([]);
   const [intervalosGlobal, setIntervalosGlobal] = useState({ inicio: "", fin: "" });
   const [intervalosDia, setIntervalosDia] = useState<Record<string, { inicio: string, fin: string }[]>>({});
 
-  const [resultadoDisponibles, setResultadoDisponibles] = useState<any[]>([]);
-  const [resultadoHorario, setResultadoHorario] = useState<any[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Modal features
   const [modalStudent, setModalStudent] = useState<any | null>(null);
   const [modalHorario, setModalHorario] = useState<any[]>([]);
 
-  const openModal = async (est: any) => {
-    setModalStudent(est);
-    const hor = await getHorarioClases([est.nombre_completo]);
-    setModalHorario(hor);
-  };
-
-  useEffect(() => {
-    async function updateEstudiantes() {
-      const data = await getEstudiantes(selPromociones);
-      setEstudiantes(data);
-      setSelEstudiantes(prev => prev.filter(name => data.some((e: any) => e.nombre_completo === name)));
+  // Estudiantes filtrados por promoción para el dropdown de selección de estudiantes
+  const estudiantesDropdown = useMemo(() => {
+    if (selPromociones.length === 0 || selPromociones.includes("TODAS")) {
+      return allStudents;
     }
-    updateEstudiantes();
-  }, [selPromociones]);
+    return allStudents.filter(s => s.promo && selPromociones.includes(s.promo));
+  }, [allStudents, selPromociones]);
 
-  const handleBuscar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const intervalosData: Record<string, {inicio: number, fin: number}[]> = {};
+  // Si cambia la promoción seleccionada, descartar estudiantes seleccionados que ya no pertenezcan
+  useEffect(() => {
+    setSelEstudiantes(prev => prev.filter(name => estudiantesDropdown.some((e: any) => e.nombre_completo === name)));
+  }, [estudiantesDropdown]);
+
+  // Estudiantes base según filtro de promoción y selección de estudiantes
+  const baseEstudiantes = useMemo(() => {
+    return allStudents.filter(student => {
+      if (selPromociones.length > 0 && !selPromociones.includes("TODAS")) {
+        if (!student.promo || !selPromociones.includes(student.promo)) {
+          return false;
+        }
+      }
+      if (selEstudiantes.length > 0 && !selEstudiantes.includes("TODOS")) {
+        if (!selEstudiantes.includes(student.nombre_completo)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allStudents, selPromociones, selEstudiantes]);
+
+  // Cálculo 100% instantáneo y automático de disponibilidad/antidisponibilidad en memoria
+  const resultadoDisponibles = useMemo(() => {
+    if (!selDias || selDias.length === 0) {
+      return [];
+    }
+
+    const intervalosData: Record<string, { inicio: number, fin: number }[]> = {};
     for (const dia of selDias) {
       let bloques = intervalosDia[dia] || [];
-      if (bloques.length === 0) bloques = [{inicio: '', fin: ''}];
-      
-      const mappedBloques = bloques.map(b => {
+      if (bloques.length === 0) bloques = [{ inicio: '', fin: '' }];
+
+      intervalosData[dia] = bloques.map(b => {
         const ini = b.inicio || intervalosGlobal.inicio;
         const fin = b.fin || intervalosGlobal.fin;
         return {
@@ -58,18 +79,54 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
           fin: toMin(fin) || 22 * 60
         };
       });
-      intervalosData[dia] = mappedBloques;
     }
 
-    const res = await buscarDisponibilidad(modo, selDias, intervalosData, selPromociones, selEstudiantes);
-    setResultadoDisponibles(res.disponibles);
+    const ocupadosSet = new Set<string>();
 
-    if (selEstudiantes.length > 0 && !selEstudiantes.includes("TODOS")) {
-      const hor = await getHorarioClases(selEstudiantes);
-      setResultadoHorario(hor);
+    for (const student of baseEstudiantes) {
+      for (const sch of (student.schedules || [])) {
+        const diaIntervalos = intervalosData[sch.dia];
+        if (!diaIntervalos) continue;
+
+        for (const inter of diaIntervalos) {
+          if (sch.hora_fin_min > inter.inicio && sch.hora_inicio_min < inter.fin) {
+            ocupadosSet.add(student.id);
+            break;
+          }
+        }
+        if (ocupadosSet.has(student.id)) break;
+      }
+    }
+
+    if (modo === "antidisponibilidad") {
+      return baseEstudiantes.filter(s => ocupadosSet.has(s.id));
     } else {
-      setResultadoHorario([]);
+      return baseEstudiantes.filter(s => !ocupadosSet.has(s.id));
     }
+  }, [baseEstudiantes, selDias, intervalosDia, intervalosGlobal, modo]);
+
+  // Cálculo instantáneo del horario para estudiantes seleccionados
+  const resultadoHorario = useMemo(() => {
+    if (selEstudiantes.length === 0 || selEstudiantes.includes("TODOS")) {
+      return [];
+    }
+    const selSet = new Set(selEstudiantes);
+    const matched = allStudents.filter(s => selSet.has(s.nombre_completo));
+    return matched.flatMap(student =>
+      (student.schedules || []).map((sch: any) => ({
+        ...sch,
+        student
+      }))
+    );
+  }, [allStudents, selEstudiantes]);
+
+  const openModal = (est: any) => {
+    setModalStudent(est);
+    const found = allStudents.find(s => s.id === est.id || s.nombre_completo === est.nombre_completo);
+    const hor = found
+      ? (found.schedules || []).map((sch: any) => ({ ...sch, student: found }))
+      : [];
+    setModalHorario(hor);
   };
 
   return (
@@ -84,7 +141,7 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
         initPromociones={initPromociones}
         selPromociones={selPromociones}
         setSelPromociones={setSelPromociones}
-        estudiantes={estudiantes}
+        estudiantes={estudiantesDropdown}
         selEstudiantes={selEstudiantes}
         setSelEstudiantes={setSelEstudiantes}
         isDropdownOpen={isDropdownOpen}
@@ -95,13 +152,13 @@ export default function MainClient({ initPromociones, initEstudiantes }: { initP
         setIntervalosGlobal={setIntervalosGlobal}
         intervalosDia={intervalosDia}
         setIntervalosDia={setIntervalosDia}
-        handleBuscar={handleBuscar}
       />
 
       <AvailableStudentsTable 
         estudiantes={resultadoDisponibles} 
         modo={modo} 
         onStudentClick={openModal} 
+        hasSelectedDays={selDias.length > 0}
       />
 
       <WeeklyTimetable 

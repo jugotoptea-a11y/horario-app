@@ -4,9 +4,10 @@ interface AvailableStudentsTableProps {
   estudiantes: any[];
   modo: 'disponibilidad' | 'antidisponibilidad';
   onStudentClick: (est: any) => void;
+  hasSelectedDays?: boolean;
 }
 
-export default function AvailableStudentsTable({ estudiantes, modo, onStudentClick }: AvailableStudentsTableProps) {
+export default function AvailableStudentsTable({ estudiantes, modo, onStudentClick, hasSelectedDays = true }: AvailableStudentsTableProps) {
   const [tableFilter, setTableFilter] = useState('');
   const [promoFilter, setPromoFilter] = useState<string[]>([]);
   const [isPromoDropdownOpen, setIsPromoDropdownOpen] = useState(false);
@@ -91,7 +92,26 @@ export default function AvailableStudentsTable({ estudiantes, modo, onStudentCli
 
   const promocionesDisponibles = Array.from(new Set(estudiantes.map(e => String(e.promo)))).sort();
 
-  if (estudiantes.length === 0) return null;
+  if (!hasSelectedDays) {
+    return (
+      <div style={{ marginTop: '24px', padding: '16px 20px', borderRadius: '12px', background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', textAlign: 'center', fontSize: '14px' }}>
+        Selecciona uno o más <strong>días</strong> arriba para ver la disponibilidad en tiempo real automáticamente.
+      </div>
+    );
+  }
+
+  if (estudiantes.length === 0) {
+    return (
+      <div className={`result ${modo === 'antidisponibilidad' ? 'result-antidisponibilidad' : ''}`}>
+        <h3>
+          {modo === 'antidisponibilidad' ? 'Estudiantes NO disponibles' : 'Estudiantes disponibles'} (0)
+        </h3>
+        <p style={{ color: '#666', marginTop: '12px', fontStyle: 'italic', textAlign: 'center', padding: '16px' }}>
+          No se encontraron estudiantes para los filtros seleccionados.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={`result ${modo === 'antidisponibilidad' ? 'result-antidisponibilidad' : ''}`}>
@@ -179,28 +199,36 @@ export default function AvailableStudentsTable({ estudiantes, modo, onStudentCli
           </tr>
         </thead>
         <tbody>
-          {sortedAndFilteredResult.map(est => (
-            <tr className="result-row" key={est.id} style={{ cursor: 'pointer' }} onClick={() => onStudentClick(est)}>
-              <td style={{textAlign: 'center'}} onClick={e => e.stopPropagation()}>
-                <input type="checkbox" checked={selectedRows.has(est.id)} onChange={e => {
-                  const next = new Set(selectedRows);
-                  if (e.target.checked) next.add(est.id);
-                  else next.delete(est.id);
-                  setSelectedRows(next);
-                }} />
-              </td>
-              <td className="est-promo">{est.promo}</td>
-              <td className="est-nombre">{est.nombre_completo}</td>
-              <td className="est-doc">{est.id}</td>
-              <td className="est-correo">{est.correo}</td>
-              <td className="est-contacto">{est.contacto}</td>
-              <td onClick={e => e.stopPropagation()}>
-                <button type="button" onClick={() => handleCopy(`${est.promo}\t${est.nombre_completo}\t${est.id}\t${est.correo || ''}\t${est.contacto || ''}`, est.id)} style={{ width: 'auto', padding: '4px 8px', fontSize: '11px', margin: 0, borderRadius: '6px' }}>
-                  {copiedId === est.id ? 'Copiado' : 'Copiar'}
-                </button>
+          {sortedAndFilteredResult.length === 0 ? (
+            <tr>
+              <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: '#666', fontStyle: 'italic' }}>
+                No hay estudiantes que coincidan con la búsqueda interna.
               </td>
             </tr>
-          ))}
+          ) : (
+            sortedAndFilteredResult.map(est => (
+              <tr className="result-row" key={est.id} style={{ cursor: 'pointer' }} onClick={() => onStudentClick(est)}>
+                <td style={{textAlign: 'center'}} onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" checked={selectedRows.has(est.id)} onChange={e => {
+                    const next = new Set(selectedRows);
+                    if (e.target.checked) next.add(est.id);
+                    else next.delete(est.id);
+                    setSelectedRows(next);
+                  }} />
+                </td>
+                <td className="est-promo">{est.promo}</td>
+                <td className="est-nombre">{est.nombre_completo}</td>
+                <td className="est-doc">{est.id}</td>
+                <td className="est-correo">{est.correo}</td>
+                <td className="est-contacto">{est.contacto}</td>
+                <td onClick={e => e.stopPropagation()}>
+                  <button type="button" onClick={() => handleCopy(`${est.promo}\t${est.nombre_completo}\t${est.id}\t${est.correo || ''}\t${est.contacto || ''}`, est.id)} style={{ width: 'auto', padding: '4px 8px', fontSize: '11px', margin: 0, borderRadius: '6px' }}>
+                    {copiedId === est.id ? 'Copiado' : 'Copiar'}
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
