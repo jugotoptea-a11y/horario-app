@@ -1,11 +1,74 @@
 import React, { useState } from "react";
-import { previewSchedulesPdf, applySchedulesPdf } from "../actions/gestionActions";
+import * as XLSX from "xlsx";
+import { previewSchedulesPdf, applySchedulesPdf, getSchedulesVerificationData } from "../actions/gestionActions";
 
 export default function PdfUploadPanel() {
     const [pdfPreview, setPdfPreview] = useState<{ estudiantes: any[], ignored: string[], schedulesToInsert: any[] } | null>(null);
     const [pdfPromo, setPdfPromo] = useState("2024");
     const [isPdfLoading, setIsPdfLoading] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const [pdfSuccess, setPdfSuccess] = useState("");
+
+    const handleDownloadExcel = async () => {
+        setIsExporting(true);
+        try {
+            const data = await getSchedulesVerificationData();
+            if (data.totalEstudiantes === 0 && data.totalHorarios === 0) {
+                alert("No hay datos de estudiantes ni horarios registrados actualmente en la base de datos.");
+                setIsExporting(false);
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+
+            // Hoja 1: Detalle completo de horarios actuales
+            const wsHorarios = XLSX.utils.json_to_sheet(
+                data.detalleHorarios.length > 0
+                    ? data.detalleHorarios
+                    : [{ Mensaje: "No hay horarios cargados actualmente en la base de datos" }]
+            );
+            wsHorarios["!cols"] = [
+                { wch: 15 }, // Documento
+                { wch: 35 }, // Nombre Estudiante
+                { wch: 18 }, // Promoción Estudiante
+                { wch: 25 }, // Programa
+                { wch: 28 }, // Correo
+                { wch: 15 }, // Contacto
+                { wch: 16 }, // Promoción Horario
+                { wch: 12 }, // Periodo
+                { wch: 12 }, // Día
+                { wch: 12 }, // Hora Inicio
+                { wch: 12 }, // Hora Fin
+                { wch: 16 }, // Código Clase
+                { wch: 38 }, // Materia
+                { wch: 30 }, // Docente
+            ];
+            XLSX.utils.book_append_sheet(wb, wsHorarios, "Horarios Detallados");
+
+            // Hoja 2: Resumen por estudiante para auditoría rápida
+            const wsResumen = XLSX.utils.json_to_sheet(data.resumenEstudiantes);
+            wsResumen["!cols"] = [
+                { wch: 15 }, // Documento
+                { wch: 35 }, // Nombre Completo
+                { wch: 12 }, // Promoción
+                { wch: 25 }, // Programa
+                { wch: 28 }, // Correo
+                { wch: 15 }, // Contacto
+                { wch: 16 }, // Municipio
+                { wch: 16 }, // Estado Horario
+                { wch: 18 }, // Materias Distintas
+                { wch: 14 }, // Total Franjas
+                { wch: 65 }, // Lista de Materias
+            ];
+            XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen por Estudiante");
+
+            const fecha = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(wb, `verificacion_horarios_${fecha}.xlsx`);
+        } catch (error: any) {
+            alert("Error generando el archivo Excel: " + error.message);
+        }
+        setIsExporting(false);
+    };
 
     const handlePdfFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -40,7 +103,32 @@ export default function PdfUploadPanel() {
 
     return (
         <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            <h3>Actualizar Horarios desde PDFs</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '10px' }}>
+                <h3 style={{ margin: 0 }}>Actualizar Horarios desde PDFs</h3>
+                <button
+                    type="button"
+                    onClick={handleDownloadExcel}
+                    disabled={isExporting}
+                    style={{
+                        width: 'auto',
+                        margin: 0,
+                        padding: '9px 16px',
+                        background: isExporting ? '#64748b' : '#166534',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        cursor: isExporting ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 6px rgba(22, 101, 52, 0.2)'
+                    }}
+                >
+                    {isExporting ? "Generando Excel..." : "↓ Descargar Excel de Horarios Actuales (Verificación)"}
+                </button>
+            </div>
             <p style={{ fontSize: '14px', color: '#475569', marginBottom: '15px' }}>
                 Simula la antigua "carpeta H". Selecciona la promoción y sube uno o múltiples archivos PDF. El sistema cruzará la información con los estudiantes actuales. Si el estudiante ya tenía un horario, será reemplazado.
             </p>

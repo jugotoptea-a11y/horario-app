@@ -399,3 +399,77 @@ export async function applySchedulesPdf(schedulesData: any[]) {
   revalidatePath('/');
   return schedulesToInsert.length;
 }
+
+
+const ORDEN_DIAS: Record<string, number> = {
+  LUNES: 1,
+  MARTES: 2,
+  MIERCOLES: 3,
+  JUEVES: 4,
+  VIERNES: 5,
+  SABADO: 6,
+  DOMINGO: 7,
+};
+
+export async function getSchedulesVerificationData() {
+  const students = await prisma.student.findMany({
+    orderBy: [{ promo: 'desc' }, { nombre_norm: 'asc' }],
+    include: {
+      schedules: true,
+    },
+  });
+
+  const detalleHorarios: any[] = [];
+  const resumenEstudiantes: any[] = [];
+
+  for (const st of students) {
+    const sortedSchedules = [...st.schedules].sort((a, b) => {
+      const dayDiff = (ORDEN_DIAS[a.dia] || 99) - (ORDEN_DIAS[b.dia] || 99);
+      if (dayDiff !== 0) return dayDiff;
+      return a.hora_inicio_min - b.hora_inicio_min;
+    });
+
+    const materiasUnicas = Array.from(new Set(sortedSchedules.map(s => s.materia)));
+
+    resumenEstudiantes.push({
+      Documento: st.id,
+      "Nombre Completo": st.nombre_completo,
+      "Promoción": st.promo || "",
+      Programa: st.programa || "",
+      Correo: st.correo || "",
+      Contacto: st.contacto || "",
+      Municipio: st.municipio || "",
+      "Estado Horario": sortedSchedules.length > 0 ? "Con Horario" : "SIN HORARIO",
+      "Materias Distintas": materiasUnicas.length,
+      "Total Franjas": sortedSchedules.length,
+      "Lista de Materias": materiasUnicas.join(" | "),
+    });
+
+    for (const sch of sortedSchedules) {
+      detalleHorarios.push({
+        Documento: st.id,
+        "Nombre Estudiante": st.nombre_completo,
+        "Promoción Estudiante": st.promo || "",
+        Programa: st.programa || "",
+        Correo: st.correo || "",
+        Contacto: st.contacto || "",
+        "Promoción Horario": sch.promocion || "",
+        Periodo: sch.periodo || "",
+        "Día": sch.dia,
+        "Hora Inicio": sch.hora_inicio,
+        "Hora Fin": sch.hora_fin,
+        "Código Clase": sch.codigo_clase || "",
+        Materia: sch.materia,
+        Docente: sch.docente || "",
+      });
+    }
+  }
+
+  return {
+    detalleHorarios,
+    resumenEstudiantes,
+    totalHorarios: detalleHorarios.length,
+    totalEstudiantesConHorario: resumenEstudiantes.filter(r => r["Total Franjas"] > 0).length,
+    totalEstudiantes: students.length,
+  };
+}
